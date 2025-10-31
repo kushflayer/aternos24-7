@@ -1,0 +1,14 @@
+# Node.js dependencies
+node_modules/
+
+# Logs and temp files
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Local data
+registered.json
+
+# System files
+.DS_Store
+Thumbs.db
