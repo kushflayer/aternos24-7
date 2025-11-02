@@ -1,76 +1,90 @@
-// index.js (CommonJS) — cracked username: kushflayer
+// index.js — Aternos Auto Login + AFK Bot
+// Works with Render/Replit — cracked username support
 
-const mineflayer = require('mineflayer');
-const express = require('express');
-const fs = require('fs');
+const mineflayer = require("mineflayer");
+const express = require("express");
+const fs = require("fs");
 
-const WEB_PORT = 8080;
-const PASSWORD = "welcomebot";      // <-- change to your real register/login password
-const REGISTER_FILE = "registered.json";
+const WEB_PORT = process.env.PORT || 8080;
 const HOST = "Unkown_SMP.aternos.me";
-const MC_PORT = 49664;              // <-- updated port
-const USERNAME = "kushflayer";      // <-- cracked username
+const MC_PORT = 49664;
+const USERNAME = "kushflayer";
+const PASSWORD = "welcomebot";
+const VERSION = "1.20.1";
+const REGISTER_FILE = "registered.json";
 
-// small web server to keep Replit awake
+let reconnecting = false;
+
+// 🕸 Keep app alive (for Render/Replit uptime)
 const app = express();
-app.get('/', (req, res) => res.send('🤖 Aternos AFK Bot running'));
-app.listen(WEB_PORT, () => console.log(`Web server listening on ${WEB_PORT}`));
+app.get("/", (req, res) => res.send("🤖 Aternos Bot is online and running!"));
+app.listen(WEB_PORT, () =>
+  console.log(`🌐 Web server running on port ${WEB_PORT}`)
+);
 
+// 🧠 Create Bot Function
 function createBot() {
   const bot = mineflayer.createBot({
     host: HOST,
     port: MC_PORT,
     username: USERNAME,
-    version: "1.20.1",
-    auth: "offline"
+    version: VERSION,
+    auth: "offline",
   });
 
-  bot.once('spawn', () => {
-    console.log('✅ Bot joined the server as', USERNAME);
+  // When bot joins the server
+  bot.once("spawn", () => {
+    console.log(`✅ Bot joined ${HOST} as ${USERNAME}`);
 
-    // check storage for first-time register
     let alreadyRegistered = false;
     try {
       if (fs.existsSync(REGISTER_FILE)) {
-        const data = JSON.parse(fs.readFileSync(REGISTER_FILE, 'utf8'));
+        const data = JSON.parse(fs.readFileSync(REGISTER_FILE, "utf8"));
         alreadyRegistered = !!data.registered;
       }
-    } catch (e) {
-      console.log('⚠️ Error reading register file:', e);
+    } catch (err) {
+      console.log("⚠️ Error reading register file:", err);
     }
 
     if (!alreadyRegistered) {
-      console.log('📝 Registering (first time)...');
+      console.log("📝 Registering new account...");
       bot.chat(`/register ${PASSWORD}`);
-      try {
-        fs.writeFileSync(REGISTER_FILE, JSON.stringify({ registered: true }));
-      } catch (e) {
-        console.log('⚠️ Could not write register file:', e);
-      }
+      fs.writeFileSync(REGISTER_FILE, JSON.stringify({ registered: true }));
     } else {
-      console.log('🔐 Logging in...');
-      setTimeout(() => bot.chat(`/login ${PASSWORD}`), 2000);
+      console.log("🔐 Logging in...");
+      setTimeout(() => bot.chat(`/login ${PASSWORD}`), 3000);
     }
 
-    // simple anti-AFK: jump every 10s
+    // Anti-AFK — jump every 15s
     setInterval(() => {
-      bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 500);
-    }, 10000);
+      bot.setControlState("jump", true);
+      setTimeout(() => bot.setControlState("jump", false), 400);
+    }, 15000);
   });
 
-  bot.on('end', () => {
-    console.log('❌ Disconnected — reconnecting in 10s...');
-    setTimeout(createBot, 10000);
+  // Handle disconnects gracefully
+  bot.on("end", () => {
+    console.log("❌ Disconnected — will reconnect in 15s...");
+    if (!reconnecting) {
+      reconnecting = true;
+      setTimeout(() => {
+        reconnecting = false;
+        createBot();
+      }, 15000);
+    }
   });
 
-  bot.on('kicked', reason => {
-    console.log('💢 Kicked:', reason);
+  // Handle being kicked
+  bot.on("kicked", (reason) => {
+    console.log("💢 Kicked from server:", reason);
+    console.log("🔁 Reconnecting in 15s...");
+    setTimeout(createBot, 15000);
   });
 
-  bot.on('error', err => {
-    console.log('⚠️ Bot error:', err);
+  // Catch errors without crashing app
+  bot.on("error", (err) => {
+    console.log("⚠️ Bot error:", err);
   });
 }
 
-createBot(); 
+createBot();
